@@ -1,0 +1,1 @@
+cmd_/home/equipo3/Desktop/Practica1/prac1.ko := ld -r -m elf_i386 -T /usr/src/linux-headers-3.8.0-29-generic/scripts/module-common.lds --build-id  -o /home/equipo3/Desktop/Practica1/prac1.ko /home/equipo3/Desktop/Practica1/prac1.o /home/equipo3/Desktop/Practica1/prac1.mod.o

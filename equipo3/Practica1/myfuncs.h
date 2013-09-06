@@ -1,0 +1,1 @@
+int funcx(int);

@@ -1,0 +1,28 @@
+#include <linux/module.h>
+#include <linux/stat.h>
+#include "myfuncs.h"
+
+int result=0;
+static int num=1;
+module_param(num,int,S_IRUGO);
+
+static int __init hello_init(void){
+
+	pr_info("Hello World\n");
+	//pr_info("pr_info %d", num);
+	printk("printk %d", num);
+	return 0;
+}
+
+static void __exit hello_exit(void){
+	
+	pr_info("Goodbye!!\n");
+	result=funcx(num);
+	printk("printk %d", result);
+}
+
+module_init(hello_init);
+module_exit(hello_exit);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Jorge Paz, Alejandro DR");
+MODULE_DESCRIPTION("Prac1");
