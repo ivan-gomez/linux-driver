@@ -12,7 +12,7 @@ return 0;
 static void __exit hello_exit(void)
 {
 /* Validando que los valores del parametro esten en un rango aceptable */
-if (module_param < 0 || module_param > 50)
+if (module_param < 0 || module_param > 15)
 	pr_info("Parametro invalido, proporcione uno entre el rango 0-50");
 else
 	pr_info("%i\n", factorial(module_param));

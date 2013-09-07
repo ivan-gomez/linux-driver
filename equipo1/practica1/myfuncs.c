@@ -1,5 +1,5 @@
 #include "myfuncs.h"
-/* Funcion factorial, recibe un parametro mayor a 0 y menor o igual a 50
+/* Funcion factorial, recibe un parametro mayor a 0 y menor o igual a 15
    como precondicion y calcula el factorial de ese numero de manera
    recursiva. */
 int factorial(int n)
