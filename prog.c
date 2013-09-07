@@ -13,7 +13,6 @@ int resta(int x, int y)
 
 int main()
 {
-	printf("Hola\n");
 
 	return 0;
 }
