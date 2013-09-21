@@ -105,7 +105,6 @@ void play(int volume, int resample, char *file)
 		if (frames < 0) {
 			printf("snd_pcm_writei failed: %s\n",
 				snd_strerror(err));
-			break;
 		}
 		if (frames > 0 && frames < lSize/4)
 			printf("Short write (expected %li, wrote %li)\n",
