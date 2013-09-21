@@ -2,22 +2,27 @@
 #include <linux/stat.h>
 #include "myfuncs.h"
 
-int result=0;
-static int num=1;
-module_param(num,int,S_IRUGO);
+int result = 1;
+static int num = 1;
+module_param(num, int, S_IRUGO);
 
-static int __init hello_init(void){
-
+/*Init Module Function*/
+static int __init hello_init(void) {
 	pr_info("Factorial init\n");
-	printk("El numero den entrada es: %d\n", num);
+	pr_info("El numero de entrada es: %d\n", num);
 	return 0;
 }
 
-static void __exit hello_exit(void){
-	
+/*Exit Module Function*/
+static void __exit hello_exit(void) {
 	pr_info("Factorial exit!!\n");
-	result=funcx(num);
-	printk("El factorial de %d es %d\n", num, result);
+/*Validar si el número queda entre los parametros correctos*/
+	if ((num <= 15) && (num >= 0)) {
+		result = funcx(num);
+		pr_info("El factorial de %d es %d\n", num, result);
+	} else{
+		pr_info("Parametro Invalido. Ingresar numero de 0-15\n");
+	}
 }
 
 module_init(hello_init);
