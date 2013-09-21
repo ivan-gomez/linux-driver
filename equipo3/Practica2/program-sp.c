@@ -98,7 +98,7 @@ void play(int volume, int resample, char *file)
 		exit(1);
 	}
 
-	for (i = 0; i < 1; i++) {
+	/*for (i = 0; i < 1; i++) {*/ /*For multiple channels or sound looping*/
 		frames = snd_pcm_writei(handle, buffer, lSize/4);
 		if (frames < 0)
 			frames = snd_pcm_recover(handle, frames, 0);
@@ -110,7 +110,7 @@ void play(int volume, int resample, char *file)
 		if (frames > 0 && frames < lSize/4)
 			printf("Short write (expected %li, wrote %li)\n",
 				(long)lSize/4, frames);
-	}
+	/*}*/
 
 	fclose(pFile);
 	free(buffer);
@@ -163,7 +163,7 @@ void record(int volume, int resample, char *file)
 void showUsage(void)
 {
 	printf("The format is the following:\n");
-	printf("./playrecord [P | R] [volume] [sample_rate] [audio file]\n");
+	printf("./playrecord <P | R> <volume> <sample_rate> <audio file>\n");
 }
 
 int main(int argc, char **argv)
