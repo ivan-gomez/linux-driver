@@ -3,18 +3,23 @@
 #include <linux/cdev.h>		/* char devices structure and aux functions */
 #include <linux/device.h>	/* generic, centralized driver model */
 #include <linux/uaccess.h>	/* for accessing user-space */
+#include <linux/slab.h>		/* for kmalloc */
 
 #define KBUFF_MAX_SIZE	1024	/* size of the kernel side buffer */
 #define DEVICE_NAME 	"mydev"
+#define NUM_DEVICES	10
 
+struct priv_data {
+	unsigned minor;
+	unsigned major;
+};
 
 static unsigned major = 0;			/* major number */
 static struct cdev mydev;			/* to register with kernel */
 static struct class *mydev_class = NULL;	/* to register with sysfs */
 static struct device *mydev_device;		/* to register with sysfs */
-
-static char kbuffer[KBUFF_MAX_SIZE];		/* kernel side buffer */
-static unsigned long kbuffer_size = 0;		/* kernel buffer length */
+static char kbuffers[NUM_DEVICES][KBUFF_MAX_SIZE];	/* kernel side buffer */
+static unsigned long kbuffer_sizes[NUM_DEVICES];	/* kernel buffer length */
 
 /*
  * mydev_read()
@@ -24,17 +29,22 @@ static ssize_t mydev_read(struct file *filp, char __user *buffer, size_t nbuf,
 								loff_t *offset)
 {
 	int ret = 0;
-	pr_info("[%d] %s\n", __LINE__, __func__);
+	struct priv_data *priv_data = filp->private_data;
+	char *kbuffer = &(kbuffers[priv_data->minor][0]);
+	unsigned long *kbuffer_size = &kbuffer_sizes[priv_data->minor];
+
+	pr_info("kbuffer = %s, size = %ld\n", kbuffer, *kbuffer_size);
+	pr_info("Major : %d, Minor : %d\n", priv_data->major, priv_data->minor);
 	pr_info("[%d] nbuf = %d, offset = %d", __LINE__, (int)nbuf, (int)*offset);
 	/* If offset is greater that size of kbuffer, there is nothing to copy */
-	if (*offset >= kbuffer_size) {
-		pr_info("[%d] Offset greater or equal than kbuffer size: %d >= %ld", __LINE__, (int)*offset, kbuffer_size);
+	if (*offset >= *kbuffer_size) {
+		pr_info("[%d] Offset greater or equal than kbuffer size: %d >= %ld", __LINE__, (int)*offset, *kbuffer_size);
 		goto out;
 	}
 
 	/* Check for maximum size of kernel buffer */
-	if ((nbuf + *offset) > kbuffer_size)
-		nbuf = kbuffer_size - *offset;
+	if ((nbuf + *offset) > *kbuffer_size)
+		nbuf = *kbuffer_size - *offset;
 
 	/* fill the buffer, return the buffer size */
 	pr_info("[%d] Copying Buffer from kernel to user space...\n", __LINE__);
@@ -61,11 +71,15 @@ static ssize_t mydev_write(struct file *filp, const char __user *buffer,
 						size_t nbuf, loff_t *offset)
 {
 	int ret = 0;
+	struct priv_data *priv_data = filp->private_data;
+	char *kbuffer = &(kbuffers[priv_data->minor][0]);
+	unsigned long *kbuffer_size = &kbuffer_sizes[priv_data->minor];
 
+	pr_info("Major : %d, Minor : %d\n", priv_data->major, priv_data->minor);
 	pr_info("[%d] nbuf = %d, offset = %d", __LINE__, (int)nbuf, (int)*offset);
 
 	if (*offset >= KBUFF_MAX_SIZE) {
-		pr_info("[%d] Offset greater or equal than kbuffer size: %d >= %ld", __LINE__, (int)*offset, kbuffer_size);
+		pr_info("[%d] Offset greater or equal than kbuffer size: %d >= %ld", __LINE__, (int)*offset, *kbuffer_size);
 		goto out;
 	}
 
@@ -83,7 +97,7 @@ static ssize_t mydev_write(struct file *filp, const char __user *buffer,
 	}
 
 	*offset += nbuf;
-	kbuffer_size = *offset;
+	*kbuffer_size = *offset;
 	ret = nbuf;
 
 out:
@@ -98,7 +112,16 @@ out:
 
 static int mydev_open(struct inode *ip, struct file *filp)
 {
+	struct priv_data *p_data;
 
+	p_data = kmalloc(sizeof(p_data), GFP_KERNEL);
+	if (p_data == NULL)
+		return -ENOMEM;
+
+	p_data->major = imajor(ip);
+	p_data->minor = iminor(ip);
+
+	filp->private_data = p_data;
 	pr_info("Driver's open function was called\n");
 
 	return 0;
@@ -111,7 +134,7 @@ static int mydev_open(struct inode *ip, struct file *filp)
 
 static int mydev_close(struct inode *ip, struct file *filp)
 {
-
+	kfree(filp->private_data);
 	pr_info("Driver's close function was called\n");
 
 	return 0;
@@ -136,10 +159,11 @@ static const struct file_operations mydev_fops = {
 static int __init my_calc_init (void)
 {
 	int ret;
+	int minor;
 	dev_t devid;
 
 	/* Dynamic allocation of MAJOR and MINOR numbers */
-	ret = alloc_chrdev_region(&devid, 0, 1, DEVICE_NAME);
+	ret = alloc_chrdev_region(&devid, 0, NUM_DEVICES, DEVICE_NAME);
 
 	if (ret) {
 		printk("Error: Failed registering major number\n");
@@ -153,7 +177,7 @@ static int __init my_calc_init (void)
 	cdev_init(&mydev, &mydev_fops);
 
 	/* Register the char device with the kernel */
-	ret = cdev_add(&mydev, devid, 1);
+	ret = cdev_add(&mydev, devid, NUM_DEVICES);
 	if (ret) {
 		printk("Error: Failed registering with the kernel\n");
 		unregister_chrdev_region(devid, 1);
@@ -167,10 +191,12 @@ static int __init my_calc_init (void)
 		mydev_class = NULL;
 	} else {
 		/* Register device with sysfs (creates device node in /dev) */
-		mydev_device = device_create(mydev_class, NULL, devid, NULL, DEVICE_NAME"0");
-		if (IS_ERR(mydev_device)) {
-			printk("device_create() failed: %ld\n", PTR_ERR(mydev_device));
-			mydev_device = NULL;
+		for (minor = 0; minor < NUM_DEVICES; minor++) {
+			mydev_device = device_create(mydev_class, NULL, MKDEV(major, minor), NULL, DEVICE_NAME"%d", minor);
+			if (IS_ERR(mydev_device)) {
+				printk("device_create() failed: %ld\n", PTR_ERR(mydev_device));
+				mydev_device = NULL;
+			}
 		}
 	}
 
@@ -184,15 +210,19 @@ static int __init my_calc_init (void)
  */
 static void __exit my_calc_exit(void) 
 {
+	int minor;
+
 	/* Deregister char device from kernel */
 	cdev_del(&mydev);
 
 	/* Release MAJOR and MINOR numbers */
-	unregister_chrdev_region(MKDEV(major, 0), 1);
+	unregister_chrdev_region(MKDEV(major, 0), NUM_DEVICES);
 
 	/* Deregister device from sysfs */
 	if (mydev_class != NULL) {
-		device_destroy(mydev_class, MKDEV(major, 0));
+		for (minor = 0; minor < NUM_DEVICES; minor++) {
+			device_destroy(mydev_class, MKDEV(major, minor));
+		}
 		class_destroy(mydev_class);
 	}
 
